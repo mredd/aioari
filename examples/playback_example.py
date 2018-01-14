@@ -52,7 +52,7 @@ def on_start(channel, event):
             playback.stop()
             channel.continueInDialplan()
         else:
-            print("Unknown DTMF %s" % digit, file=sys.stderr)
+            print >> sys.stderr, "Unknown DTMF %s" % digit
 
     channel.on_event('ChannelDtmfReceived', on_dtmf)
 

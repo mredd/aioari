@@ -20,6 +20,7 @@ Stasis events relating to that object.
 import re
 import requests
 import logging
+import json
 
 log = logging.getLogger(__name__)
 
@@ -47,12 +48,12 @@ class Repository(object):
     def __repr__(self):
         return "Repository(%s)" % self.name
 
-    def __getattr__(self, item):
+    async def __getattr__(self, item):
         """Maps resource operations to methods on this object.
 
         :param item: Item name.
         """
-        oper = getattr(self.api, item, None)
+        oper = await getattr(self.api, item, None)
         if not (hasattr(oper, '__call__') and hasattr(oper, 'json')):
             raise AttributeError(
                 "'%r' object has no attribute '%s'" % (self, item))
@@ -137,12 +138,13 @@ class BaseObject(object):
 
         :param item:
         """
+        log.debug("Issuing command %s", item)
         oper = getattr(self.api, item, None)
         if not (hasattr(oper, '__call__') and hasattr(oper, 'json')):
             raise AttributeError(
                 "'%r' object has no attribute '%r'" % (self, item))
 
-        def enrich_operation(**kwargs):
+        async def enrich_operation(**kwargs):
             """Enriches an operation by specifying parameters specifying this
             object's id (i.e., channelId=self.id), and promotes HTTP response
             to a first-class object.
@@ -152,7 +154,9 @@ class BaseObject(object):
             """
             # Add id to param list
             kwargs.update(self.id_generator.get_params(self.json))
-            return promote(self.client, oper(**kwargs), oper.json)
+            resp = await oper(**kwargs)
+            enriched = await promote(self.client, resp, oper.json)
+            return enriched
 
         return enrich_operation
 
@@ -175,10 +179,10 @@ class BaseObject(object):
             """
             if isinstance(objects, dict):
                 if self.id in [c.id for c in objects.values()]:
-                    fn(objects, event, *args, **kwargs)
+                    return fn(objects, event, *args, **kwargs)
             else:
                 if self.id == objects.id:
-                    fn(objects, event, *args, **kwargs)
+                    return fn(objects, event, *args, **kwargs)
 
         if not self.event_reg:
             msg = "Event callback registration called on object with no events"
@@ -339,20 +343,22 @@ class Mailbox(BaseObject):
             client, client.swagger.mailboxes, mailbox_json, None)
 
 
-def promote(client, resp, operation_json):
+async def promote(client, resp, operation_json):
     """Promote a response from the request's HTTP response to a first class
      object.
 
     :param client:  ARI client.
     :type  client:  client.Client
-    :param resp:    HTTP resonse.
-    :type  resp:    requests.Response
+    :param resp:    aiohttp client resonse.
+    :type  resp:    aiohttp.ClientResponse
     :param operation_json: JSON model from Swagger API.
     :type  operation_json: dict
     :return:
     """
-    resp.raise_for_status()
-
+    log.debug("resp=%s",resp)
+    resp = await resp.text()
+    if resp == "":
+        return None
     response_class = operation_json['responseClass']
     is_list = False
     m = re.match('''List\[(.*)\]''', response_class)
@@ -361,14 +367,14 @@ def promote(client, resp, operation_json):
         is_list = True
     factory = CLASS_MAP.get(response_class)
     if factory:
-        resp_json = resp.json()
+        resp_json = json.loads(resp) #resp.json()
         if is_list:
             return [factory(client, obj) for obj in resp_json]
         return factory(client, resp_json)
     if resp.status_code == requests.codes.no_content:
         return None
     log.info("No mapping for %s; returning JSON" % response_class)
-    return resp.json()
+    return json.loads(resp)
 
 
 CLASS_MAP = {

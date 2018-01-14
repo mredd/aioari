@@ -5,7 +5,7 @@ import httpretty
 import json
 import requests
 import unittest
-import urllib.request
+import urllib
 
 from ari_test.utils import AriTestCase
 
@@ -19,7 +19,7 @@ DELETE = httpretty.DELETE
 # noinspection PyDocstring
 class ClientTest(AriTestCase):
     def test_docs(self):
-        fp = urllib.request.urlopen("http://ari.py/ari/api-docs/resources.json")
+        fp = urllib.urlopen("http://ari.py/ari/api-docs/resources.json")
         try:
             actual = json.load(fp)
             self.assertEqual(self.BASE_URL, actual['basePath'])

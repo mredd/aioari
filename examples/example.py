@@ -12,11 +12,10 @@ to the channel. Press # to hang up, and * for a special message.
 #
 
 import ari
+import asyncio
+import logging
 
-client = ari.connect('http://localhost:8088/', 'hey', 'peekaboo')
-
-
-def on_dtmf(channel, event):
+async def on_dtmf(channel, event):
     """Callback for DTMF events.
 
     When DTMF is received, play the digit back to the channel. # hangs up,
@@ -26,16 +25,17 @@ def on_dtmf(channel, event):
     :param event: Event.
     """
     digit = event['digit']
+    print(digit)
     if digit == '#':
-        channel.play(media='sound:goodbye')
-        channel.continueInDialplan()
+        await channel.play(media='sound:goodbye')
+        await channel.continueInDialplan()
     elif digit == '*':
-        channel.play(media='sound:asterisk-friend')
+        await channel.play(media='sound:asterisk-friend')
     else:
-        channel.play(media='sound:digits/%s' % digit)
+        await channel.play(media='sound:digits/%s' % digit)
 
 
-def on_start(channel, event):
+async def on_start(channel, event):
     """Callback for StasisStart events.
 
     On new channels, register the on_dtmf callback, answer the channel and
@@ -44,12 +44,29 @@ def on_start(channel, event):
     :param channel: Channel DTMF was received from.
     :param event: Event.
     """
-    channel.on_event('ChannelDtmfReceived', on_dtmf)
-    channel.answer()
-    channel.play(media='sound:hello-world')
+    print(channel['channel'], event)
+    channel['channel'].on_event('ChannelDtmfReceived', on_dtmf)
+    await channel['channel'].answer()
+    await channel['channel'].play(media='sound:hello-world')
 
+async def on_end(channel, event):
+        """Callback for StasisEnd events.
 
+        On new channels, register the on_dtmf callback, answer the channel and
+        play "Hello, world"
+
+        :param channel: Channel DTMF was received from.
+        :param event: Event.
+        """
+        print(channel, event)
+
+sessions = {}
+
+logging.basicConfig(level=logging.DEBUG)
+loop = asyncio.get_event_loop()
+client = ari.connect('http://192.168.254.60:8088/', 'remari', '@rip@$$', loop=loop)
+loop.run_until_complete(client.init())
 client.on_channel_event('StasisStart', on_start)
-
+client.on_channel_event('StasisEnd', on_end)
 # Run the WebSocket
-client.run(apps="hello")
+loop.run_until_complete(client.run(apps="hello"))

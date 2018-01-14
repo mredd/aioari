@@ -6,16 +6,15 @@
 """
 
 import json
-import logging
-import urllib.parse
-import swaggerpy.client
+import urllib
+import aioswagger11.client
 
-from ari.model import *
+from aioari.model import *
 
 log = logging.getLogger(__name__)
 
 
-class Client(object):
+class AsyncClient(object):
     """ARI Client object.
 
     :param base_url: Base URL for accessing Asterisk.
@@ -24,13 +23,11 @@ class Client(object):
 
     def __init__(self, base_url, http_client):
         url = urllib.parse.urljoin(base_url, "ari/api-docs/resources.json")
+        self.swagger = aioswagger11.client.AsyncSwaggerClient(
+            http_client=http_client, url=url)
 
-        self.swagger = swaggerpy.client.SwaggerClient(
-            url, http_client=http_client)
-        self.repositories = {
-            name: Repository(self, name, api)
-            for (name, api) in self.swagger.resources.items()}
-
+    async def init(self):
+        await self.swagger.init()
         # Extract models out of the events resource
         events = [api['api_declaration']
                   for api in self.swagger.api_docs['apis']
@@ -40,6 +37,9 @@ class Client(object):
         else:
             self.event_models = {}
 
+        self.repositories = {
+            name: Repository(self, name, api)
+            for (name, api) in self.swagger.resources.items()}
         self.websockets = set()
         self.event_listeners = {}
         self.exception_handler = \
@@ -56,15 +56,15 @@ class Client(object):
                 "'%r' object has no attribute '%s'" % (self, item))
         return repo
 
-    def close(self):
+    async def close(self):
         """Close this ARI client.
 
         This method will close any currently open WebSockets, and close the
         underlying Swaggerclient.
         """
         for ws in self.websockets:
-            ws.send_close()
-        self.swagger.close()
+            await ws.close()
+        await self.swagger.close()
 
     def get_repo(self, name):
         """Get a specific repo by name.
@@ -75,7 +75,7 @@ class Client(object):
         """
         return self.repositories.get(name)
 
-    def __run(self, ws):
+    async def __run(self, ws):
         """Drains all messages from a WebSocket, sending them to the client's
         listeners.
 
@@ -84,10 +84,11 @@ class Client(object):
         # TypeChecker false positive on iter(callable, sentinel) -> iterator
         # Fixed in plugin v3.0.1
         # noinspection PyTypeChecker
-        for msg_str in iter(lambda: ws.recv(), None):
-            msg_json = json.loads(msg_str)
+        while True:
+            msg = await ws.receive()
+            msg_json = json.loads(msg.data)
             if not isinstance(msg_json, dict) or 'type' not in msg_json:
-                log.error("Invalid event: %s" % msg_str)
+                log.error("Invalid event: %s" % msg)
                 continue
 
             listeners = list(self.event_listeners.get(msg_json['type'], []))
@@ -95,13 +96,14 @@ class Client(object):
                 # noinspection PyBroadException
                 try:
                     callback, args, kwargs = listener
+                    log.debug("cb_type=%s" % type(callback))
                     args = args or ()
                     kwargs = kwargs or {}
-                    callback(msg_json, *args, **kwargs)
+                    await callback(msg_json, *args, **kwargs)
                 except Exception as e:
                     self.exception_handler(e)
 
-    def run(self, apps):
+    async def run(self, apps):
         """Connect to the WebSocket and begin processing messages.
 
         This method will block until all messages have been received from the
@@ -112,12 +114,12 @@ class Client(object):
         """
         if isinstance(apps, list):
             apps = ','.join(apps)
-        ws = self.swagger.events.eventWebsocket(app=apps)
+        ws = await self.swagger.events.eventWebsocket(app=apps)
         self.websockets.add(ws)
         try:
-            self.__run(ws)
+            await self.__run(ws)
         finally:
-            ws.close()
+            await ws.close()
             self.websockets.remove(ws)
 
     def on_event(self, event_type, event_cb, *args, **kwargs):
@@ -134,6 +136,7 @@ class Client(object):
             if event_cb == cb[0]:
                 listeners.remove(cb)
         callback_obj = (event_cb, args, kwargs)
+        log.debug("event_cb=%s" % event_cb)
         listeners.append(callback_obj)
         client = self
 
@@ -166,6 +169,7 @@ class Client(object):
         :param kwargs: Keyword arguments to pass to event_cb
         """
         # Find the associated model from the Swagger declaration
+        log.debug("On object event %s %s %s %s"%(event_type, event_cb, factory_fn, model_id))
         event_model = self.event_models.get(event_type)
         if not event_model:
             raise ValueError("Cannot find event model '%s'" % event_type)
@@ -192,10 +196,11 @@ class Client(object):
             # If there's only one field in the schema, just pass that along
             if len(obj_fields) == 1:
                 if obj:
-                    obj = next(iter(obj.values()))
+                    vals = list(obj.values())
+                    obj = vals[0]
                 else:
                     obj = None
-            event_cb(obj, event, *args, **kwargs)
+            return event_cb(obj, event, *args, **kwargs)
 
         return self.on_event(event_type, extract_objects,
                              *args,
@@ -210,7 +215,7 @@ class Client(object):
         :param args: Arguments to pass to fn
         :param kwargs: Keyword arguments to pass to fn
         """
-        return self.on_object_event(event_type, fn, Channel, 'Channel',
+        self.on_object_event(event_type, fn, Channel, 'Channel',
                                     *args, **kwargs)
 
     def on_bridge_event(self, event_type, fn, *args, **kwargs):
@@ -222,7 +227,7 @@ class Client(object):
         :param args: Arguments to pass to fn
         :param kwargs: Keyword arguments to pass to fn
         """
-        return self.on_object_event(event_type, fn, Bridge, 'Bridge',
+        self.on_object_event(event_type, fn, Bridge, 'Bridge',
                                     *args, **kwargs)
 
     def on_playback_event(self, event_type, fn, *args, **kwargs):
@@ -234,7 +239,7 @@ class Client(object):
         :param args: Arguments to pass to fn
         :param kwargs: Keyword arguments to pass to fn
         """
-        return self.on_object_event(event_type, fn, Playback, 'Playback',
+        self.on_object_event(event_type, fn, Playback, 'Playback',
                                     *args, **kwargs)
 
     def on_live_recording_event(self, event_type, fn, *args, **kwargs):
@@ -246,7 +251,7 @@ class Client(object):
         :param args: Arguments to pass to fn
         :param kwargs: Keyword arguments to pass to fn
         """
-        return self.on_object_event(event_type, fn, LiveRecording,
+        self.on_object_event(event_type, fn, LiveRecording,
                                     'LiveRecording', *args, **kwargs)
 
     def on_stored_recording_event(self, event_type, fn, *args, **kwargs):
@@ -258,7 +263,7 @@ class Client(object):
         :param args: Arguments to pass to fn
         :param kwargs: Keyword arguments to pass to fn
         """
-        return self.on_object_event(event_type, fn, StoredRecording,
+        self.on_object_event(event_type, fn, StoredRecording,
                                     'StoredRecording', *args, **kwargs)
 
     def on_endpoint_event(self, event_type, fn, *args, **kwargs):
@@ -270,7 +275,7 @@ class Client(object):
         :param args: Arguments to pass to fn
         :param kwargs: Keyword arguments to pass to fn
         """
-        return self.on_object_event(event_type, fn, Endpoint, 'Endpoint',
+        self.on_object_event(event_type, fn, Endpoint, 'Endpoint',
                                     *args, **kwargs)
 
     def on_device_state_event(self, event_type, fn, *args, **kwargs):
@@ -282,7 +287,7 @@ class Client(object):
         :param args: Arguments to pass to fn
         :param kwargs: Keyword arguments to pass to fn
         """
-        return self.on_object_event(event_type, fn, DeviceState, 'DeviceState',
+        self.on_object_event(event_type, fn, DeviceState, 'DeviceState',
                                     *args, **kwargs)
 
     def on_sound_event(self, event_type, fn, *args, **kwargs):
@@ -294,6 +299,6 @@ class Client(object):
         :param args: Arguments to pass to fn
         :param kwargs: Keyword arguments to pass to fn
         """
-        return self.on_object_event(event_type, fn, Sound, 'Sound',
+        self.on_object_event(event_type, fn, Sound, 'Sound',
                                     *args, **kwargs)
 

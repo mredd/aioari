@@ -10,7 +10,7 @@
 import ari
 import logging
 import sys
-import threading
+import thread
 
 logging.basicConfig()
 
@@ -56,7 +56,7 @@ def on_start(channel, event):
 client.on_channel_event('StasisStart', on_start)
 
 # Run the WebSocket
-sync = threading.allocate_lock()
+sync = thread.allocate_lock()
 
 
 def run():
@@ -67,9 +67,9 @@ def run():
     sync.release()
 
 
-thr = threading.start_new_thread(run, ())
-print("Press enter to exit")
+thr = thread.start_new_thread(run, ())
+print "Press enter to exit"
 sys.stdin.readline()
 client.close()
 sync.acquire()
-print("Application finished")
+print "Application finished"
