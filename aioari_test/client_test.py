@@ -100,7 +100,7 @@ class TestClient(AriTestCase):
             self.fail("Should have thrown an exception")
         except web_exceptions.HTTPError as e:
             assert e.response.status_code == 500
-            assert e.response.json() == {"message": "This is just a test"}
+            assert (await e.response.json()) == {"message": "This is just a test"}
 
     @pytest.mark.asyncio
     async def test_endpoints(self):
