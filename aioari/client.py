@@ -99,7 +99,11 @@ class Client(object):
                     log.debug("cb_type=%s" % type(callback))
                     args = args or ()
                     kwargs = kwargs or {}
-                    await callback(msg_json, *args, **kwargs)
+                    cb = callback(msg_json, *args, **kwargs)
+                    # The callback may or may not be an async function
+                    if hasattr(cb,'__await__'):
+                        await cb
+
                 except Exception as e:
                     self.exception_handler(e)
 
