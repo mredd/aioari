@@ -4,7 +4,6 @@ import httpretty as htpr
 import os
 from urllib import parse as urlparse
 import aioari
-import requests
 import pytest
 
 

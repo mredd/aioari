@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
 import aioari
+from aiohttp import web_exceptions
 import httpretty
 import json
-import requests
 import pytest
 from urllib.request import urlopen
 
@@ -98,7 +98,7 @@ class TestClient(AriTestCase):
         try:
             await self.uut.channels.list()
             self.fail("Should have thrown an exception")
-        except requests.HTTPError as e:
+        except web_exceptions.HTTPError as e:
             assert e.response.status_code == 500
             assert e.response.json() == {"message": "This is just a test"}
 

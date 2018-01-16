@@ -7,11 +7,9 @@
 #
 # Copyright (c) 2013, Digium, Inc.
 #
-import requests
-
 import aioari
 
-from requests import HTTPError
+from aiohttp.web_exceptions import HTTPError, HTTPNotFound
 
 OUTGOING_ENDPOINT = "SIP/blink"
 
@@ -41,7 +39,7 @@ def async safe_hangup(channel):
         await channel.hangup()
     except HTTPError as e:
         # Ignore 404's, since channels can go away before we get to them
-        if e.response.status_code != requests.codes.not_found:
+        if e.response.status_code != HTTPNotFound.status_code:
             raise
 
 

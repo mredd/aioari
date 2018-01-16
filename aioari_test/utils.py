@@ -4,8 +4,8 @@ import httpretty
 import os
 from urllib import parse as urlparse
 import aioari
-import requests
 
+from aiohttp.web_exceptions import HTTPNoContent
 
 class AriTestCase:
     """Base class for mock async ARI server.
@@ -57,7 +57,7 @@ class AriTestCase:
         """
         url = self.build_url(*args)
         if kwargs.get('body') is None and 'status' not in kwargs:
-            kwargs['status'] = requests.codes.no_content
+            kwargs['status'] = HTTPNoContent.status_code
         httpretty.register_uri(method, url,
                                content_type="application/json",
                                **kwargs)
