@@ -48,19 +48,31 @@ class Repository(object):
     def __repr__(self):
         return "Repository(%s)" % self.name
 
-    async def __getattr__(self, item):
+    def __getattr__(self, item):
         """Maps resource operations to methods on this object.
 
         :param item: Item name.
-        """
-        oper = await getattr(self.api, item, None)
-        if not (hasattr(oper, '__call__') and hasattr(oper, 'json')):
-            raise AttributeError(
-                "'%r' object has no attribute '%s'" % (self, item))
 
-        # The returned function wraps the underlying operation, promoting the
-        # received HTTP response to a first class object.
-        return lambda **kwargs: promote(self.client, oper(**kwargs), oper.json)
+        This method needs to return a callable that returns a coroutine,
+        which allows us to defer the attribute lookup.
+        """
+        class AttrOp:
+            def __init__(self,p,item):
+                self.p = p
+                self.item = item
+            def __repr__(self):
+                return "<AttrOp<%s>.%s>" % (self.p, self.item)
+
+            async def __call__(self,**kwargs):
+                oper = getattr(self.p.api, self.item, None)
+                if not (hasattr(oper, '__call__') and hasattr(oper, 'json')):
+                    raise AttributeError(
+                        "'%r' object has no attribute '%s'" % (self.p, self.item))
+                res = await oper(**kwargs)
+                res = await promote(self.p.client, res, oper.json)
+                return res
+        return AttrOp(self,item)
+        #return lambda **kwargs: promote(self.client, oper(**kwargs), oper.json)
 
 
 class ObjectIdGenerator(object):
