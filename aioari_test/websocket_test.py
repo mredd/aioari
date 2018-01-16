@@ -92,9 +92,9 @@ class TestWebSocket(AriTestCase):
             '{ "type": "StasisStart", "channel": { "id": "test-channel" } }'
         ]
 
-        def cb(channel, event):
+        async def cb(channel, event):
             self.record_event(event)
-            channel.hangup()
+            await channel.hangup()
 
         self.uut.on_channel_event('StasisStart', cb)
         await self.uut.run('test', _test_msgs=messages)
@@ -135,9 +135,9 @@ class TestWebSocket(AriTestCase):
 
         channel = await self.uut.channels.get(channelId='test-channel')
 
-        def cb(channel, event):
+        async def cb(channel, event):
             self.record_event(event)
-            channel.hangup()
+            await channel.hangup()
 
         channel.on_event('ChannelStateChange', cb)
         await self.uut.run('test', _test_msgs=messages)
