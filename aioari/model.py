@@ -368,8 +368,8 @@ async def promote(client, resp, operation_json):
     :return:
     """
     log.debug("resp=%s",resp)
-    resp = await resp.text()
-    if resp == "":
+    res = await resp.text()
+    if res == "":
         return None
     response_class = operation_json['responseClass']
     is_list = False
@@ -379,14 +379,14 @@ async def promote(client, resp, operation_json):
         is_list = True
     factory = CLASS_MAP.get(response_class)
     if factory:
-        resp_json = json.loads(resp) #resp.json()
+        resp_json = json.loads(res) #resp.json()
         if is_list:
             return [factory(client, obj) for obj in resp_json]
         return factory(client, resp_json)
-    if resp.status_code == requests.codes.no_content:
+    if resp.status == requests.codes.no_content:
         return None
     log.info("No mapping for %s; returning JSON" % response_class)
-    return json.loads(resp)
+    return json.loads(res)
 
 
 CLASS_MAP = {
