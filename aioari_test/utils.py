@@ -17,12 +17,11 @@ class AriTestCase:
         """Setup httpretty; create ARI client.
         """
         self.serve_api()
-        self.uut = event_loop.run_until_complete(aioari.connect('http://ari.py/', 'test', 'test'))
 
     def tearDown(self, event_loop):
         """Cleanup.
         """
-        event_loop.run_until_complete(self.uut.close())
+        pass
 
     @classmethod
     def build_url(cls, *args):

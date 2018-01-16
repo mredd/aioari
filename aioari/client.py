@@ -109,7 +109,7 @@ class Client(object):
                 except Exception as e:
                     self.exception_handler(e)
 
-    async def run(self, apps):
+    async def run(self, apps, *, _test_msgs=[]):
         """Connect to the WebSocket and begin processing messages.
 
         This method will block until all messages have been received from the
@@ -122,6 +122,10 @@ class Client(object):
             apps = ','.join(apps)
         ws = await self.swagger.events.eventWebsocket(app=apps)
         self.websockets.add(ws)
+
+        # For tests
+        for m in _test_msgs:
+            ws.push(m)
         try:
             await self.__run(ws)
         finally:

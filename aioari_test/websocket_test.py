@@ -23,16 +23,20 @@ DELETE = httpretty.DELETE
 class TestWebSocket(AriTestCase):
     def setUp(self, event_loop):
         super(TestWebSocket, self).setUp(event_loop)
+        self.uut = event_loop.run_until_complete(connect(BASE_URL, [], loop=event_loop))
         self.actual = []
+
+    def tearDown(self, event_loop):
+        event_loop.run_until_complete(self.uut.close())
+        super().tearDown(event_loop)
 
     def record_event(self, event):
         self.actual.append(event)
 
     @pytest.mark.asyncio
     async def test_empty(self, event_loop):
-        uut = await connect(BASE_URL, [], loop=event_loop)
-        uut.on_event('ev', self.record_event)
-        await uut.run('test')
+        self.uut.on_event('ev', self.record_event)
+        await self.uut.run('test')
         assert self.actual == []
 
     @pytest.mark.asyncio
@@ -44,9 +48,9 @@ class TestWebSocket(AriTestCase):
             '{"type": "not_ev", "data": 5}',
             '{"type": "ev", "data": 9}'
         ]
-        uut = await connect(BASE_URL, messages, loop=event_loop)
-        uut.on_event("ev", self.record_event)
-        await uut.run('test')
+        self.uut.on_event("ev", self.record_event)
+        await self.uut.run('test', _test_msgs=messages)
+
         expected = [
             {"type": "ev", "data": 1},
             {"type": "ev", "data": 2},
@@ -60,7 +64,6 @@ class TestWebSocket(AriTestCase):
             '{"type": "ev", "data": 1}',
             '{"type": "ev", "data": 2}'
         ]
-        uut = await connect(BASE_URL, messages, loop=event_loop)
         self.once_ran = 0
 
         def only_once(event):
@@ -71,9 +74,9 @@ class TestWebSocket(AriTestCase):
         def both_events(event):
             self.record_event(event)
 
-        self.once = uut.on_event("ev", only_once)
-        self.both = uut.on_event("ev", both_events)
-        await uut.run('test')
+        self.once = self.uut.on_event("ev", only_once)
+        self.both = self.uut.on_event("ev", both_events)
+        await self.uut.run('test', _test_msgs=messages)
 
         expected = [
             {"type": "ev", "data": 1},
@@ -88,14 +91,13 @@ class TestWebSocket(AriTestCase):
         messages = [
             '{ "type": "StasisStart", "channel": { "id": "test-channel" } }'
         ]
-        uut = await connect(BASE_URL, messages, loop=event_loop)
 
         def cb(channel, event):
             self.record_event(event)
             channel.hangup()
 
-        uut.on_channel_event('StasisStart', cb)
-        await uut.run('test')
+        self.uut.on_channel_event('StasisStart', cb)
+        await self.uut.run('test', _test_msgs=messages)
 
         expected = [
             {"type": "StasisStart", "channel": {"id": "test-channel"}}
@@ -108,14 +110,13 @@ class TestWebSocket(AriTestCase):
             '{ "type": "StasisStart", "channel": { "id": "test-channel1" } }',
             '{ "type": "StasisStart", "channel": { "id": "test-channel2" } }'
         ]
-        uut = await connect(BASE_URL, messages, loop=event_loop)
 
         def only_once(channel, event):
             self.record_event(event)
             self.once.close()
 
-        self.once = uut.on_channel_event('StasisStart', only_once)
-        await uut.run('test')
+        self.once = self.uut.on_channel_event('StasisStart', only_once)
+        await self.uut.run('test', _test_msgs=messages)
 
         expected = [
             {"type": "StasisStart", "channel": {"id": "test-channel1"}}
@@ -132,15 +133,14 @@ class TestWebSocket(AriTestCase):
             '{"type": "ChannelStateChange", "channel": {"id": "test-channel"}}'
         ]
 
-        uut = await connect(BASE_URL, messages, loop=event_loop)
-        channel = uut.channels.get(channelId='test-channel')
+        channel = await self.uut.channels.get(channelId='test-channel')
 
         def cb(channel, event):
             self.record_event(event)
             channel.hangup()
 
         channel.on_event('ChannelStateChange', cb)
-        await uut.run('test')
+        await self.uut.run('test', _test_msgs=messages)
 
         expected = [
             {"type": "ChannelStateChange", "channel": {"id": "test-channel"}}
@@ -157,8 +157,7 @@ class TestWebSocket(AriTestCase):
         ]
         obj = {'key': 'val'}
 
-        uut = await connect(BASE_URL, messages, loop=event_loop)
-        channel = await uut.channels.get(channelId='test-channel')
+        channel = await self.uut.channels.get(channelId='test-channel')
 
         async def cb(channel, event, arg):
             if arg == 'done':
@@ -176,16 +175,15 @@ class TestWebSocket(AriTestCase):
         channel.on_event('ChannelDtmfReceived', cb, obj)
         channel.on_event('ChannelDtmfReceived', cb2, 2.0, arg3=[1, 2, 3])
         channel.on_event('ChannelDtmfReceived', cb, 'done')
-        await uut.run('test')
+        await self.uut.run('test', _test_msgs=messages)
 
         expected = [1, 2, obj, 2.0, None, [1, 2, 3]]
         assert self.actual == expected
 
     @pytest.mark.asyncio
     async def test_bad_event_type(self, event_loop):
-        uut = await connect(BASE_URL, [], loop=event_loop)
         try:
-            uut.on_object_event(
+            self.uut.on_object_event(
                 'BadEventType', self.noop, self.noop, 'Channel')
             self.fail("Event does not exist")
         except ValueError:
@@ -193,9 +191,8 @@ class TestWebSocket(AriTestCase):
 
     @pytest.mark.asyncio
     async def test_bad_object_type(self, event_loop):
-        uut = await connect(BASE_URL, [])
         try:
-            uut.on_object_event('StasisStart', self.noop, self.noop, 'Bridge')
+            self.uut.on_object_event('StasisStart', self.noop, self.noop, 'Bridge')
             self.fail("Event has no bridge")
         except ValueError:
             pass

@@ -19,6 +19,17 @@ DELETE = httpretty.DELETE
 # noinspection PyDocstring
 @pytest.mark.usefixtures("httpretty")
 class TestClient(AriTestCase):
+    def setUp(self, event_loop):
+        """Setup httpretty; create ARI client.
+        """
+        super().setUp(event_loop)
+        self.uut = event_loop.run_until_complete(aioari.connect('http://ari.py/', 'test', 'test'))
+
+    def tearDown(self, event_loop):
+        
+        event_loop.run_until_complete(self.uut.close())
+        super().tearDown(event_loop)
+
     @pytest.mark.asyncio
     async def test_docs(self):
         fp = urlopen("http://ari.py/ari/api-docs/resources.json")
