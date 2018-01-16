@@ -86,6 +86,8 @@ class Client(object):
         # noinspection PyTypeChecker
         while True:
             msg = await ws.receive()
+            if msg is None:
+                return ## EOF
             msg_json = json.loads(msg.data)
             if not isinstance(msg_json, dict) or 'type' not in msg_json:
                 log.error("Invalid event: %s" % msg)
