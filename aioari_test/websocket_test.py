@@ -5,6 +5,7 @@
 
 import pytest
 import aioari
+import asyncio
 import httpretty
 
 from aioari_test.utils import AriTestCase
@@ -201,6 +202,9 @@ class TestWebSocket(AriTestCase):
     def noop(self, *args, **kwargs):
         self.fail("Noop unexpectedly called")
 
+class FakeMsg:
+    def __init__(self,data):
+        self.data = data
 
 class WebSocketStubConnection(object):
     """Stub WebSocket connection.
@@ -208,28 +212,42 @@ class WebSocketStubConnection(object):
     :param messages:
     """
 
-    def __init__(self, messages):
-        self.messages = list(messages)
-        self.messages.reverse()
+    def __init__(self, messages, loop=None):
+        self.q = asyncio.Queue(loop=loop)
+        for m in messages:
+            self.q.put_nowait(m)
 
-    async def recv(self):
+    async def receive(self):
         """Fake receive method
 
         :return: Next message, or None if no more messages.
         """
-        if self.messages:
-            return str(self.messages.pop())
-        return None
+        if self.q is None:
+            return None
+        try:
+            msg = self.q.get_nowait()
+        except asyncio.QueueEmpty:
+            msg = None
+        if msg is None:
+            self.q = None
+        if msg is not None:
+            msg = FakeMsg(msg)
+        return msg
+
+    def push(self, msg):
+        self.q.put_nowait(msg)
 
     async def send_close(self):
         """Fake send_close method
         """
-        return
+        if self.q is not None:
+            self.q.put(None)
 
     async def close(self):
         """Fake close method
         """
-        return
+        if self.q is not None:
+            self.q.put(None)
 
 
 class WebSocketStubClient(AsynchronousHttpClient):
@@ -253,7 +271,7 @@ class WebSocketStubClient(AsynchronousHttpClient):
         :param params: Ignored.
         :return: Stub connection.
         """
-        return WebSocketStubConnection(self.messages)
+        return WebSocketStubConnection(self.messages, self.session._loop)
 
 
 def raise_exceptions(ex):
