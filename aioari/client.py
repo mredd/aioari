@@ -221,7 +221,7 @@ class Client(object):
         :param args: Arguments to pass to fn
         :param kwargs: Keyword arguments to pass to fn
         """
-        self.on_object_event(event_type, fn, Channel, 'Channel',
+        return self.on_object_event(event_type, fn, Channel, 'Channel',
                                     *args, **kwargs)
 
     def on_bridge_event(self, event_type, fn, *args, **kwargs):
@@ -233,7 +233,7 @@ class Client(object):
         :param args: Arguments to pass to fn
         :param kwargs: Keyword arguments to pass to fn
         """
-        self.on_object_event(event_type, fn, Bridge, 'Bridge',
+        return self.on_object_event(event_type, fn, Bridge, 'Bridge',
                                     *args, **kwargs)
 
     def on_playback_event(self, event_type, fn, *args, **kwargs):
@@ -245,7 +245,7 @@ class Client(object):
         :param args: Arguments to pass to fn
         :param kwargs: Keyword arguments to pass to fn
         """
-        self.on_object_event(event_type, fn, Playback, 'Playback',
+        return self.on_object_event(event_type, fn, Playback, 'Playback',
                                     *args, **kwargs)
 
     def on_live_recording_event(self, event_type, fn, *args, **kwargs):
@@ -257,7 +257,7 @@ class Client(object):
         :param args: Arguments to pass to fn
         :param kwargs: Keyword arguments to pass to fn
         """
-        self.on_object_event(event_type, fn, LiveRecording,
+        return self.on_object_event(event_type, fn, LiveRecording,
                                     'LiveRecording', *args, **kwargs)
 
     def on_stored_recording_event(self, event_type, fn, *args, **kwargs):
@@ -269,7 +269,7 @@ class Client(object):
         :param args: Arguments to pass to fn
         :param kwargs: Keyword arguments to pass to fn
         """
-        self.on_object_event(event_type, fn, StoredRecording,
+        return self.on_object_event(event_type, fn, StoredRecording,
                                     'StoredRecording', *args, **kwargs)
 
     def on_endpoint_event(self, event_type, fn, *args, **kwargs):
@@ -281,7 +281,7 @@ class Client(object):
         :param args: Arguments to pass to fn
         :param kwargs: Keyword arguments to pass to fn
         """
-        self.on_object_event(event_type, fn, Endpoint, 'Endpoint',
+        return self.on_object_event(event_type, fn, Endpoint, 'Endpoint',
                                     *args, **kwargs)
 
     def on_device_state_event(self, event_type, fn, *args, **kwargs):
@@ -293,7 +293,7 @@ class Client(object):
         :param args: Arguments to pass to fn
         :param kwargs: Keyword arguments to pass to fn
         """
-        self.on_object_event(event_type, fn, DeviceState, 'DeviceState',
+        return self.on_object_event(event_type, fn, DeviceState, 'DeviceState',
                                     *args, **kwargs)
 
     def on_sound_event(self, event_type, fn, *args, **kwargs):
@@ -305,6 +305,6 @@ class Client(object):
         :param args: Arguments to pass to fn
         :param kwargs: Keyword arguments to pass to fn
         """
-        self.on_object_event(event_type, fn, Sound, 'Sound',
+        return self.on_object_event(event_type, fn, Sound, 'Sound',
                                     *args, **kwargs)
 
