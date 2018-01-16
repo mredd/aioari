@@ -3,12 +3,12 @@
 """WebSocket testing.
 """
 
-import unittest
-import ari
+import pytest
+import aioari
 import httpretty
 
-from ari_test.utils import AriTestCase
-from swaggerpy.http_client import SynchronousHttpClient
+from aioari_test.utils import AriTestCase
+from aioswagger11.http_client import AsynchronousHttpClient
 
 BASE_URL = "http://ari.py/ari"
 
@@ -19,21 +19,24 @@ DELETE = httpretty.DELETE
 
 
 # noinspection PyDocstring
-class WebSocketTest(AriTestCase):
-    def setUp(self):
-        super(WebSocketTest, self).setUp()
+@pytest.mark.usefixtures("httpretty")
+class TestWebSocket(AriTestCase):
+    def setUp(self, event_loop):
+        super(TestWebSocket, self).setUp(event_loop)
         self.actual = []
 
     def record_event(self, event):
         self.actual.append(event)
 
-    def test_empty(self):
-        uut = connect(BASE_URL, [])
+    @pytest.mark.asyncio
+    async def test_empty(self, event_loop):
+        uut = await connect(BASE_URL, [], loop=event_loop)
         uut.on_event('ev', self.record_event)
-        uut.run('test')
-        self.assertEqual([], self.actual)
+        await uut.run('test')
+        assert self.actual == []
 
-    def test_series(self):
+    @pytest.mark.asyncio
+    async def test_series(self, event_loop):
         messages = [
             '{"type": "ev", "data": 1}',
             '{"type": "ev", "data": 2}',
@@ -41,27 +44,28 @@ class WebSocketTest(AriTestCase):
             '{"type": "not_ev", "data": 5}',
             '{"type": "ev", "data": 9}'
         ]
-        uut = connect(BASE_URL, messages)
+        uut = await connect(BASE_URL, messages, loop=event_loop)
         uut.on_event("ev", self.record_event)
-        uut.run('test')
+        await uut.run('test')
         expected = [
             {"type": "ev", "data": 1},
             {"type": "ev", "data": 2},
             {"type": "ev", "data": 9}
         ]
-        self.assertEqual(expected, self.actual)
+        assert self.actual == expected
 
-    def test_unsubscribe(self):
+    @pytest.mark.asyncio
+    async def test_unsubscribe(self, event_loop):
         messages = [
             '{"type": "ev", "data": 1}',
             '{"type": "ev", "data": 2}'
         ]
-        uut = connect(BASE_URL, messages)
+        uut = await connect(BASE_URL, messages, loop=event_loop)
         self.once_ran = 0
 
         def only_once(event):
             self.once_ran += 1
-            self.assertEqual(1, event['data'])
+            assert event['data'] == 1
             self.once.close()
 
         def both_events(event):
@@ -69,54 +73,57 @@ class WebSocketTest(AriTestCase):
 
         self.once = uut.on_event("ev", only_once)
         self.both = uut.on_event("ev", both_events)
-        uut.run('test')
+        await uut.run('test')
 
         expected = [
             {"type": "ev", "data": 1},
             {"type": "ev", "data": 2}
         ]
-        self.assertEqual(expected, self.actual)
-        self.assertEqual(1, self.once_ran)
+        assert self.actual == expected
+        assert self.once_ran == 1
 
-    def test_on_channel(self):
+    @pytest.mark.asyncio
+    async def test_on_channel(self, event_loop):
         self.serve(DELETE, 'channels', 'test-channel')
         messages = [
             '{ "type": "StasisStart", "channel": { "id": "test-channel" } }'
         ]
-        uut = connect(BASE_URL, messages)
+        uut = await connect(BASE_URL, messages, loop=event_loop)
 
         def cb(channel, event):
             self.record_event(event)
             channel.hangup()
 
         uut.on_channel_event('StasisStart', cb)
-        uut.run('test')
+        await uut.run('test')
 
         expected = [
             {"type": "StasisStart", "channel": {"id": "test-channel"}}
         ]
-        self.assertEqual(expected, self.actual)
+        assert self.actual == expected
 
-    def test_on_channel_unsubscribe(self):
+    @pytest.mark.asyncio
+    async def test_on_channel_unsubscribe(self, event_loop):
         messages = [
             '{ "type": "StasisStart", "channel": { "id": "test-channel1" } }',
             '{ "type": "StasisStart", "channel": { "id": "test-channel2" } }'
         ]
-        uut = connect(BASE_URL, messages)
+        uut = await connect(BASE_URL, messages, loop=event_loop)
 
         def only_once(channel, event):
             self.record_event(event)
             self.once.close()
 
         self.once = uut.on_channel_event('StasisStart', only_once)
-        uut.run('test')
+        await uut.run('test')
 
         expected = [
             {"type": "StasisStart", "channel": {"id": "test-channel1"}}
         ]
-        self.assertEqual(expected, self.actual)
+        assert self.actual == expected
 
-    def test_channel_on_event(self):
+    @pytest.mark.asyncio
+    async def test_channel_on_event(self, event_loop):
         self.serve(GET, 'channels', 'test-channel',
                    body='{"id": "test-channel"}')
         self.serve(DELETE, 'channels', 'test-channel')
@@ -125,7 +132,7 @@ class WebSocketTest(AriTestCase):
             '{"type": "ChannelStateChange", "channel": {"id": "test-channel"}}'
         ]
 
-        uut = connect(BASE_URL, messages)
+        uut = await connect(BASE_URL, messages, loop=event_loop)
         channel = uut.channels.get(channelId='test-channel')
 
         def cb(channel, event):
@@ -133,14 +140,15 @@ class WebSocketTest(AriTestCase):
             channel.hangup()
 
         channel.on_event('ChannelStateChange', cb)
-        uut.run('test')
+        await uut.run('test')
 
         expected = [
             {"type": "ChannelStateChange", "channel": {"id": "test-channel"}}
         ]
-        self.assertEqual(expected, self.actual)
+        assert self.actual == expected
 
-    def test_arbitrary_callback_arguments(self):
+    @pytest.mark.asyncio
+    async def test_arbitrary_callback_arguments(self, event_loop):
         self.serve(GET, 'channels', 'test-channel',
                    body='{"id": "test-channel"}')
         self.serve(DELETE, 'channels', 'test-channel')
@@ -149,12 +157,12 @@ class WebSocketTest(AriTestCase):
         ]
         obj = {'key': 'val'}
 
-        uut = connect(BASE_URL, messages)
-        channel = uut.channels.get(channelId='test-channel')
+        uut = await connect(BASE_URL, messages, loop=event_loop)
+        channel = await uut.channels.get(channelId='test-channel')
 
-        def cb(channel, event, arg):
+        async def cb(channel, event, arg):
             if arg == 'done':
-                channel.hangup()
+                await channel.hangup()
             else:
                 self.record_event(arg)
 
@@ -168,13 +176,14 @@ class WebSocketTest(AriTestCase):
         channel.on_event('ChannelDtmfReceived', cb, obj)
         channel.on_event('ChannelDtmfReceived', cb2, 2.0, arg3=[1, 2, 3])
         channel.on_event('ChannelDtmfReceived', cb, 'done')
-        uut.run('test')
+        await uut.run('test')
 
         expected = [1, 2, obj, 2.0, None, [1, 2, 3]]
-        self.assertEqual(expected, self.actual)
+        assert self.actual == expected
 
-    def test_bad_event_type(self):
-        uut = connect(BASE_URL, [])
+    @pytest.mark.asyncio
+    async def test_bad_event_type(self, event_loop):
+        uut = await connect(BASE_URL, [], loop=event_loop)
         try:
             uut.on_object_event(
                 'BadEventType', self.noop, self.noop, 'Channel')
@@ -182,8 +191,9 @@ class WebSocketTest(AriTestCase):
         except ValueError:
             pass
 
-    def test_bad_object_type(self):
-        uut = connect(BASE_URL, [])
+    @pytest.mark.asyncio
+    async def test_bad_object_type(self, event_loop):
+        uut = await connect(BASE_URL, [])
         try:
             uut.on_object_event('StasisStart', self.noop, self.noop, 'Bridge')
             self.fail("Event has no bridge")
@@ -205,7 +215,7 @@ class WebSocketStubConnection(object):
         self.messages = list(messages)
         self.messages.reverse()
 
-    def recv(self):
+    async def recv(self):
         """Fake receive method
 
         :return: Next message, or None if no more messages.
@@ -214,29 +224,29 @@ class WebSocketStubConnection(object):
             return str(self.messages.pop())
         return None
 
-    def send_close(self):
+    async def send_close(self):
         """Fake send_close method
         """
         return
 
-    def close(self):
+    async def close(self):
         """Fake close method
         """
         return
 
 
-class WebSocketStubClient(SynchronousHttpClient):
+class WebSocketStubClient(AsynchronousHttpClient):
     """Stub WebSocket client.
 
     :param messages: List of messages to return.
     :type  messages: list
     """
 
-    def __init__(self, messages):
-        super(WebSocketStubClient, self).__init__()
+    def __init__(self, messages, loop=None):
+        super(WebSocketStubClient, self).__init__("fake_user","fake_pass", loop=loop)
         self.messages = messages
 
-    def ws_connect(self, url, params=None):
+    async def ws_connect(self, url, params=None):
         """Fake connect method.
 
         Returns a WebSocketStubConnection, which itself returns the series of
@@ -257,7 +267,7 @@ def raise_exceptions(ex):
     raise
 
 
-def connect(base_url, messages):
+async def connect(base_url, messages, loop=None):
     """Connect, with a WebSocket client test double that merely retuns the
      series of given messages.
 
@@ -265,11 +275,12 @@ def connect(base_url, messages):
     :param messages: Message strings to return from the WebSocket.
     :return: ARI client with stubbed WebSocket.
     """
-    http_client = WebSocketStubClient(messages)
-    client = ari.Client(base_url, http_client)
+    http_client = WebSocketStubClient(messages, loop=loop)
+    client = aioari.Client(base_url, http_client)
     client.exception_handler = raise_exceptions
+    await client.init()
     return client
 
-
 if __name__ == '__main__':
-    unittest.main()
+    pytest.main()
+

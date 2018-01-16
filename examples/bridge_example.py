@@ -11,24 +11,26 @@ enters the bridge, a tone is played to the bridge.
 # Copyright (c) 2013, Digium, Inc.
 #
 
-import ari
+import asyncio
+import aioari
 
-client = ari.connect('http://localhost:8088/', 'hey', 'peekaboo')
+async def setup():
+    client = await aioari.connect('http://localhost:8088/', 'hey', 'peekaboo')
 
 #
 # Find (or create) a holding bridge.
 #
-bridges = [b for b in client.bridges.list() if
-           b.json['bridge_type'] == 'holding']
-if bridges:
-    bridge = bridges[0]
-    print "Using bridge %s" % bridge.id
-else:
-    bridge = client.bridges.create(type='holding')
-    print "Created bridge %s" % bridge.id
+    bridges = [b for b in (await client.bridges.list()) if
+            b.json['bridge_type'] == 'holding']
+    if bridges:
+        bridge = bridges[0]
+        print "Using bridge %s" % bridge.id
+    else:
+        bridge = await client.bridges.create(type='holding')
+        print "Created bridge %s" % bridge.id
+    return client
 
-
-def on_enter(bridge, ev):
+async def on_enter(bridge, ev):
     """Callback for bridge enter events.
 
     When channels enter the bridge, play tones to the whole bridge.
@@ -39,7 +41,7 @@ def on_enter(bridge, ev):
     # ignore announcer channels - see ASTERISK-22744
     if ev['channel']['name'].startswith('Announcer/'):
         return
-    bridge.play(media="sound:ascending-2tone")
+    await bridge.play(media="sound:ascending-2tone")
 
 
 bridge.on_event('ChannelEnteredBridge', on_enter)
@@ -60,4 +62,6 @@ def stasis_start_cb(channel, ev):
 client.on_channel_event('StasisStart', stasis_start_cb)
 
 # Run the WebSocket
-client.run(apps='hello')
+loop = asyncio.get_event_loop()
+client = loop.run_until_complete(setup())
+loop.run_until_complete(client.run(apps='hello'))

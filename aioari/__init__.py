@@ -3,22 +3,22 @@
 # Copyright (c) 2016, fokin.denis@gmail.com
 #
 
-"""ARI client library
+"""AIOARI client library
 """
 
-import aioari.asyncclient
-import aioswagger11.http_client
+from aioari.client import Client
+from aioswagger11.http_client import AsynchronousHttpClient
 
-AsyncClient = asyncclient.AsyncClient
-
-
-def connect(base_url, username, password, loop=None):
-    """Helper method for easily connecting to ARI.
+async def connect(base_url, username, password, loop=None):
+    """Helper method for easily async connecting to ARI.
 
     :param base_url: Base URL for Asterisk HTTP server (http://localhost:8088/)
     :param username: ARI username
-    :param password: ARI password.
+    :param password: ARI password
+    :param loop: asyncio main loop (optional)
     :return:
     """
-    http_client = aioswagger11.http_client.AsynchronousHttpClient(username, password, loop)
-    return AsyncClient(base_url, http_client)
+    http_client = AsynchronousHttpClient(username, password, loop)
+    client = Client(base_url, http_client)
+    await client.init()
+    return client

@@ -2,32 +2,27 @@
 
 import httpretty
 import os
-import unittest
-import urlparse
-import ari
+from urllib import parse as urlparse
+import aioari
 import requests
 
 
-class AriTestCase(unittest.TestCase):
-    """Base class for mock ARI server.
+class AriTestCase:
+    """Base class for mock async ARI server.
     """
 
     BASE_URL = "http://ari.py/ari"
 
-    def setUp(self):
+    def setUp(self, event_loop):
         """Setup httpretty; create ARI client.
         """
-        super(AriTestCase, self).setUp()
-        httpretty.enable()
         self.serve_api()
-        self.uut = ari.connect('http://ari.py/', 'test', 'test')
+        self.uut = event_loop.run_until_complete(aioari.connect('http://ari.py/', 'test', 'test'))
 
-    def tearDown(self):
+    def tearDown(self, event_loop):
         """Cleanup.
         """
-        super(AriTestCase, self).tearDown()
-        httpretty.disable()
-        httpretty.reset()
+        event_loop.run_until_complete(self.uut.close())
 
     @classmethod
     def build_url(cls, *args):

@@ -7,18 +7,20 @@
 # Copyright (c) 2013, Digium, Inc.
 #
 
-import ari
+import asyncio
+import aioari
 import logging
 import sys
-import thread
 
 logging.basicConfig()
 
-client = ari.connect('http://localhost:8088/', 'hey', 'peekaboo')
+loop = asyncio.get_event_loop()
+
+client = loop.run_until_complete(ari.connect('http://localhost:8088/', 'hey', 'peekaboo'))
 
 
 # noinspection PyUnusedLocal
-def on_start(channel, event):
+async def on_start(channel, event):
     """Callback for StasisStart events.
 
     On new channels, register the on_dtmf callback, answer the channel and
@@ -29,7 +31,7 @@ def on_start(channel, event):
     """
     on_dtmf_handle = None
 
-    def on_dtmf(channel, event):
+    async def on_dtmf(channel, event):
         """Callback for DTMF events.
 
         When DTMF is received, play the digit back to the channel. # hangs up,
@@ -40,36 +42,32 @@ def on_start(channel, event):
         """
         digit = event['digit']
         if digit == '#':
-            channel.play(media='sound:goodbye')
-            channel.continueInDialplan()
-            on_dtmf_handle.close()
+            await channel.play(media='sound:goodbye')
+            await channel.continueInDialplan()
+            await on_dtmf_handle.close()
         elif digit == '*':
-            channel.play(media='sound:asterisk-friend')
+            await channel.play(media='sound:asterisk-friend')
         else:
-            channel.play(media='sound:digits/%s' % digit)
+            await channel.play(media='sound:digits/%s' % digit)
 
     on_dtmf_handle = channel.on_event('ChannelDtmfReceived', on_dtmf)
-    channel.answer()
-    channel.play(media='sound:hello-world')
+    await channel.answer()
+    await channel.play(media='sound:hello-world')
 
 
 client.on_channel_event('StasisStart', on_start)
 
 # Run the WebSocket
-sync = thread.allocate_lock()
-
 
 def run():
     """Thread for running the Websocket.
     """
-    sync.acquire()
-    client.run(apps="hello")
-    sync.release()
+    def fileCallback(*args):
+        client.close()
+    loop.add_reader(sys.stdin.fileno(), fileCallback)
+    await client.run(apps="hello")
 
-
-thr = thread.start_new_thread(run, ())
 print "Press enter to exit"
-sys.stdin.readline()
-client.close()
-sync.acquire()
+loop.run_until_complete(run)
 print "Application finished"
+

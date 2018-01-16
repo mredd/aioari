@@ -2,7 +2,7 @@
 # Copyright (c) 2013, Digium, Inc.
 #
 
-"""ARI client library.
+"""Async ARI client library.
 """
 
 import json
@@ -14,8 +14,8 @@ from aioari.model import *
 log = logging.getLogger(__name__)
 
 
-class AsyncClient(object):
-    """ARI Client object.
+class Client(object):
+    """Async ARI Client object.
 
     :param base_url: Base URL for accessing Asterisk.
     :param http_client: HTTP client interface.
@@ -23,7 +23,7 @@ class AsyncClient(object):
 
     def __init__(self, base_url, http_client):
         url = urllib.parse.urljoin(base_url, "ari/api-docs/resources.json")
-        self.swagger = aioswagger11.client.AsyncSwaggerClient(
+        self.swagger = aioswagger11.client.SwaggerClient(
             http_client=http_client, url=url)
 
     async def init(self):
@@ -71,7 +71,7 @@ class AsyncClient(object):
 
         :param name: Name of the repo to get
         :return: Repository, or None if not found.
-        :rtype:  ari.model.Repository
+        :rtype:  aioari.model.Repository
         """
         return self.repositories.get(name)
 

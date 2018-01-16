@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 
-import ari
+import aioari
 import httpretty
 import json
 import requests
-import unittest
-import urllib
+import pytest
+from urllib.request import urlopen
 
-from ari_test.utils import AriTestCase
+from aioari_test.utils import AriTestCase
 
 
 GET = httpretty.GET
@@ -17,137 +17,147 @@ DELETE = httpretty.DELETE
 
 
 # noinspection PyDocstring
-class ClientTest(AriTestCase):
-    def test_docs(self):
-        fp = urllib.urlopen("http://ari.py/ari/api-docs/resources.json")
+@pytest.mark.usefixtures("httpretty")
+class TestClient(AriTestCase):
+    @pytest.mark.asyncio
+    async def test_docs(self):
+        fp = urlopen("http://ari.py/ari/api-docs/resources.json")
         try:
             actual = json.load(fp)
-            self.assertEqual(self.BASE_URL, actual['basePath'])
+            assert self.BASE_URL == actual['basePath']
         finally:
             fp.close()
 
-    def test_empty_listing(self):
+    @pytest.mark.asyncio
+    async def test_empty_listing(self):
         self.serve(GET, 'channels', body='[]')
-        actual = self.uut.channels.list()
-        self.assertEqual([], actual)
+        actual = await self.uut.channels.list()
+        assert actual == []
 
-    def test_one_listing(self):
+    @pytest.mark.asyncio
+    async def test_one_listing(self):
         self.serve(GET, 'channels', body='[{"id": "test-channel"}]')
         self.serve(DELETE, 'channels', 'test-channel')
 
-        actual = self.uut.channels.list()
-        self.assertEqual(1, len(actual))
-        actual[0].hangup()
+        actual = await self.uut.channels.list()
+        assert len(actual) == 1
+        await actual[0].hangup()
 
-    def test_play(self):
+    @pytest.mark.asyncio
+    async def test_play(self):
         self.serve(GET, 'channels', 'test-channel',
                    body='{"id": "test-channel"}')
         self.serve(POST, 'channels', 'test-channel', 'play',
                    body='{"id": "test-playback"}')
         self.serve(DELETE, 'playbacks', 'test-playback')
 
-        channel = self.uut.channels.get(channelId='test-channel')
-        playback = channel.play(media='sound:test-sound')
-        playback.stop()
+        channel = await self.uut.channels.get(channelId='test-channel')
+        playback = await channel.play(media='sound:test-sound')
+        await playback.stop()
 
-    def test_bad_resource(self):
+    @pytest.mark.asyncio
+    async def test_bad_resource(self):
         try:
-            self.uut.i_am_not_a_resource.list()
+            await self.uut.i_am_not_a_resource.list()
             self.fail("How did it find that resource?")
         except AttributeError:
             pass
 
-    def test_bad_repo_method(self):
+    @pytest.mark.asyncio
+    async def test_bad_repo_method(self):
         try:
-            self.uut.channels.i_am_not_a_method()
+            await self.uut.channels.i_am_not_a_method()
             self.fail("How did it find that method?")
         except AttributeError:
             pass
 
-    def test_bad_object_method(self):
+    @pytest.mark.asyncio
+    async def test_bad_object_method(self):
         self.serve(GET, 'channels', 'test-channel',
                    body='{"id": "test-channel"}')
 
         try:
-            channel = self.uut.channels.get(channelId='test-channel')
-            channel.i_am_not_a_method()
+            channel = await self.uut.channels.get(channelId='test-channel')
+            await channel.i_am_not_a_method()
             self.fail("How did it find that method?")
         except AttributeError:
             pass
 
-    def test_bad_param(self):
+    @pytest.mark.asyncio
+    async def test_bad_param(self):
         try:
-            self.uut.channels.list(i_am_not_a_param='asdf')
+            await self.uut.channels.list(i_am_not_a_param='asdf')
             self.fail("How did it find that param?")
         except TypeError:
             pass
 
-    def test_bad_response(self):
+    @pytest.mark.asyncio
+    async def test_bad_response(self):
         self.serve(GET, 'channels', body='{"message": "This is just a test"}',
                    status=500)
         try:
-            self.uut.channels.list()
+            await self.uut.channels.list()
             self.fail("Should have thrown an exception")
         except requests.HTTPError as e:
-            self.assertEqual(500, e.response.status_code)
-            self.assertEqual(
-                {"message": "This is just a test"}, e.response.json())
+            assert e.response.status_code == 500
+            assert e.response.json() == {"message": "This is just a test"}
 
-    def test_endpoints(self):
+    @pytest.mark.asyncio
+    async def test_endpoints(self):
         self.serve(GET, 'endpoints',
                    body='[{"technology": "TEST", "resource": "1234"}]')
         self.serve(GET, 'endpoints', 'TEST', '1234',
                    body='{"technology": "TEST", "resource": "1234"}')
 
-        endpoints = self.uut.endpoints.list()
-        self.assertEqual(1, len(endpoints))
-        endpoint = endpoints[0].get()
-        self.assertEqual('TEST', endpoint.json['technology'])
-        self.assertEqual('1234', endpoint.json['resource'])
+        endpoints = await self.uut.endpoints.list()
+        assert len(endpoints) == 1
+        endpoint = await endpoints[0].get()
+        assert endpoint.json['technology'] == "TEST"
+        assert endpoint.json['resource'] == "1234"
 
-    def test_live_recording(self):
+    @pytest.mark.asyncio
+    async def test_live_recording(self):
         self.serve(GET, 'recordings', 'live', 'test-recording',
                    body='{"name": "test-recording"}')
         self.serve(DELETE, 'recordings', 'live', 'test-recording', status=204)
 
-        recording = self.uut.recordings.getLive(recordingName='test-recording')
-        recording.cancel()
+        recording = await self.uut.recordings.getLive(recordingName='test-recording')
+        await recording.cancel()
 
-    def test_stored_recording(self):
+    @pytest.mark.asyncio
+    async def test_stored_recording(self):
         self.serve(GET, 'recordings', 'stored', 'test-recording',
                    body='{"name": "test-recording"}')
         self.serve(DELETE, 'recordings', 'stored', 'test-recording',
                    status=204)
 
-        recording = self.uut.recordings.getStored(
+        recording = await self.uut.recordings.getStored(
             recordingName='test-recording')
-        recording.deleteStored()
+        await recording.deleteStored()
 
-    def test_mailboxes(self):
+    @pytest.mark.asyncio
+    async def test_mailboxes(self):
         self.serve(PUT, 'mailboxes', '1000',
                    body='{"name": "1000", "old_messages": "1", "new_messages": "3"}')
 
-        mailbox = self.uut.mailboxes.update(
+        mailbox = await self.uut.mailboxes.update(
             mailboxName='1000',
             oldMessages='1',
             newMessages='3')
-        self.assertEqual('1000', mailbox['name'])
-        self.assertEqual('1', mailbox['old_messages'])
-        self.assertEqual('3', mailbox['new_messages'])
+        assert mailbox['name'] == "1000"
+        assert mailbox['old_messages'] == "1"
+        assert mailbox['new_messages'] == "3"
 
-    def test_device_state(self):
+    @pytest.mark.asyncio
+    async def test_device_state(self):
         self.serve(PUT, 'deviceStates', 'foobar',
                    body='{"name": "foobar", "state": "BUSY"}')
-        device_state = self.uut.deviceStates.update(
+        device_state = await self.uut.deviceStates.update(
             deviceName='foobar',
             deviceState='BUSY')
-        self.assertEqual('foobar', device_state['name'])
-        self.assertEqual('BUSY', device_state['state'])
-
-    def setUp(self):
-        super(ClientTest, self).setUp()
-        self.uut = ari.connect('http://ari.py/', 'test', 'test')
+        assert device_state['name'] == "foobar"
+        assert device_state['state'] == "BUSY"
 
 
 if __name__ == '__main__':
-    unittest.main()
+    pytest.main()

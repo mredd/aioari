@@ -26,8 +26,8 @@ Install from source using the ``setup.py`` script.
 API
 ===
 
-An ARI client can be created simply by the ``ari.connect`` method. This will
-create a client based on the Swagger API downloaded from Asterisk.
+An async ARI client can be created simply by the ``aioari.connect`` method.
+This will create a client based on the Swagger API downloaded from Asterisk.
 
 The API is modeled into the Repository Pattern, as you would find in Domain
 Driven Design. Each Swagger Resource (a.k.a. API declaration) is mapped into a
@@ -91,9 +91,10 @@ Examples
 
 .. code:: Python
 
-    import ari
+    import asyncio
+    import aioari
 
-    client = ari.connect('http://localhost:8088/', 'hey', 'peekaboo')
+    client = await aioari.connect('http://localhost:8088/', 'hey', 'peekaboo')
 
     def on_dtmf(channel, event):
         digit = event['digit']
@@ -113,7 +114,9 @@ Examples
 
 
     client.on_channel_event('StasisStart', on_start)
-    client.run(apps="hello")
+
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(client.run(apps="hello"))
 
 
 
