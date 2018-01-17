@@ -11,13 +11,13 @@ from setuptools import setup
 
 setup(
     name="aioari",
-    version="0.1.0",
+    version="0.9.0",
     license="BSD 3-Clause License",
     description="Asynchronous library for accessing the Asterisk REST Interface",
     long_description=open(os.path.join(os.path.dirname(__file__),
                                        "README.rst")).read(),
     author="Matthias Urlichs",
-    author_email="<matthias@urlichs.de>",
+    author_email="matthias@urlichs.de",
     url="https://github.com/M-o-a-T/aioari",
     packages=["aioari"],
     classifiers=[
@@ -28,6 +28,6 @@ setup(
         "Operating System :: OS Independent",
         "Programming Language :: Python :: Python :: 3.5",
     ],
-    tests_require=["coverage", "httpretty", "nose", "tissue"],
+    tests_require=["coverage", "httpretty", "pytest"],
     install_requires=["aioswagger11"],
 )
