@@ -62,7 +62,7 @@ class Client(object):
         This method will close any currently open WebSockets, and close the
         underlying Swaggerclient.
         """
-        for ws in self.websockets:
+        for ws in list(self.websockets): # changes during processing
             await ws.close()
         await self.swagger.close()
 
