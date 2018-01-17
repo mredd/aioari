@@ -7,6 +7,7 @@
 
 import json
 import urllib
+import aiohttp
 import aioswagger11.client
 
 from aioari.model import *
@@ -88,6 +89,11 @@ class Client(object):
             msg = await ws.receive()
             if msg is None:
                 return ## EOF
+            elif msg.type in {aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.CLOSING}:
+                break
+            elif msg.type != aiohttp.WSMsgType.TEXT:
+                log.warning("Unknown JSON message type: %s", repr(msg))
+                continue # ignore
             msg_json = json.loads(msg.data)
             if not isinstance(msg_json, dict) or 'type' not in msg_json:
                 log.error("Invalid event: %s" % msg)
