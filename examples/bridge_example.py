@@ -14,12 +14,21 @@ enters the bridge, a tone is played to the bridge.
 import asyncio
 import aioari
 
-async def setup():
-    client = await aioari.connect('http://localhost:8088/', 'hey', 'peekaboo')
+import os
+ast_url = os.getenv("AST_URL", 'http://localhost:8088/')
+ast_username = os.getenv("AST_USER", 'asterisk')
+ast_password = os.getenv("AST_PASS", 'asterisk')
+ast_app = os.getenv("AST_APP", 'hello')
 
-#
-# Find (or create) a holding bridge.
-#
+bridge = None
+
+async def setup():
+    global bridge
+    client = await aioari.connect(ast_url, ast_username,ast_password)
+
+    #
+    # Find (or create) a holding bridge.
+    #
     bridges = [b for b in (await client.bridges.list()) if
             b.json['bridge_type'] == 'holding']
     if bridges:
@@ -55,8 +64,8 @@ def stasis_start_cb(channel, ev):
     :param channel: Channel that entered Stasis
     :param ev: Event
     """
-    channel.answer()
-    bridge.addChannel(channel=channel.id)
+    await channel.answer()
+    await bridge.addChannel(channel=channel.id)
 
 
 client.on_channel_event('StasisStart', stasis_start_cb)
@@ -64,4 +73,4 @@ client.on_channel_event('StasisStart', stasis_start_cb)
 # Run the WebSocket
 loop = asyncio.get_event_loop()
 client = loop.run_until_complete(setup())
-loop.run_until_complete(client.run(apps='hello'))
+loop.run_until_complete(client.run(apps=ast_app))

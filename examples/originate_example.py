@@ -8,13 +8,22 @@
 # Copyright (c) 2013, Digium, Inc.
 #
 import aioari
+import asyncio
 
 from aiohttp.web_exceptions import HTTPError, HTTPNotFound
 
-OUTGOING_ENDPOINT = "SIP/blink"
+import os
+ast_url = os.getenv("AST_URL", 'http://localhost:8088/')
+ast_username = os.getenv("AST_USER", 'asterisk')
+ast_password = os.getenv("AST_PASS", 'asterisk')
+ast_app = os.getenv("AST_APP", 'hello')
+ast_outgoing = os.getenv("AST_OUTGOING", 'SIP/blink')
 
-def init():
-    client = await aioari.connect('http://localhost:8088/', 'hey', 'peekaboo')
+
+holding_bridge = None
+async def init():
+    global holding_bridge
+    client = await aioari.connect(ast_url, ast_username,ast_password)
 
     #
     # Find (or create) a holding bridge.
@@ -30,7 +39,7 @@ def init():
     return client
 
 
-def async safe_hangup(channel):
+async def safe_hangup(channel):
     """Hangup a channel, ignoring 404 errors.
 
     :param channel: Channel to hangup.
@@ -43,7 +52,7 @@ def async safe_hangup(channel):
             raise
 
 
-async def on_start(incoming, event):
+async def on_start(objs, event):
     """Callback for StasisStart events.
 
     When an incoming channel starts, put it in the holding bridge and
@@ -53,18 +62,23 @@ async def on_start(incoming, event):
     :param incoming:
     :param event:
     """
-    # Only process channels with the 'incoming' argument
-    if event['args'] != ['incoming']:
+    # Don't process our own dial
+    if event['args'] == ['dialed']:
         return
 
     # Answer and put in the holding bridge
+    incoming = objs['channel']
     await incoming.answer()
-    await incoming.play(media="sound:pls-wait-connect-call")
-    await holding_bridge.addChannel(channel=incoming.id)
+    p = await incoming.play(media="sound:pls-wait-connect-call")
+    print(p)
+    await asyncio.sleep(2)
+    h = await holding_bridge.addChannel(channel=incoming.id)
+    print(h)
 
     # Originate the outgoing channel
     outgoing = await client.channels.originate(
-        endpoint=OUTGOING_ENDPOINT, app="hello", appArgs="dialed")
+        endpoint=ast_outgoing, app=ast_app, appArgs="dialed")
+    print("OUT:",outgoing)
 
     # If the incoming channel ends, hangup the outgoing channel
     incoming.on_event('StasisEnd', lambda *args: safe_hangup(outgoing))
@@ -80,9 +94,11 @@ async def on_start(incoming, event):
         :param event: Event.
         """
         # Create a bridge, putting both channels into it.
+        print("Bridging",channel)
         bridge = await client.bridges.create(type='mixing')
         await outgoing.answer()
         await bridge.addChannel(channel=[incoming.id, outgoing.id])
+        print("Bridged",incoming,outgoing)
         # Clean up the bridge when done
         outgoing.on_event('StasisEnd', lambda *args: bridge.destroy())
 
@@ -94,5 +110,5 @@ client = loop.run_until_complete(init())
 client.on_channel_event('StasisStart', on_start)
 
 # Run the WebSocket
-loop.run_until_complete(client.run(apps="hello"))
+loop.run_until_complete(client.run(apps=ast_app))
 
