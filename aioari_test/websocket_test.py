@@ -5,6 +5,7 @@
 
 import pytest
 import aioari
+import aiohttp
 import asyncio
 import httpretty
 
@@ -205,6 +206,7 @@ class TestWebSocket(AriTestCase):
 class FakeMsg:
     def __init__(self,data):
         self.data = data
+        self.type = aiohttp.WSMsgType.TEXT
 
 class WebSocketStubConnection(object):
     """Stub WebSocket connection.
