@@ -11,7 +11,7 @@ from setuptools import setup
 
 setup(
     name="aioari",
-    version="0.9.0",
+    version="0.9.1",
     license="BSD 3-Clause License",
     description="Asynchronous library for accessing the Asterisk REST Interface",
     long_description=open(os.path.join(os.path.dirname(__file__),
@@ -27,8 +27,8 @@ setup(
         "Topic :: Software Development :: Libraries :: Python Modules",
         "License :: OSI Approved :: BSD License",
         "Operating System :: OS Independent",
-        "Programming Language :: Python :: Python :: 3.5",
-        "Programming Language :: Python :: Python :: 3.6",
+        "Programming Language :: Python :: 3.5",
+        "Programming Language :: Python :: 3.6",
     ],
     tests_require=["coverage", "httpretty", "pytest"],
     install_requires=["aioswagger11"],
