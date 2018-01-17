@@ -11,9 +11,15 @@ to the channel. Press # to hang up, and * for a special message.
 # Copyright (c) 2013, Digium, Inc.
 #
 
-import ari
+import aioari
 import asyncio
 import logging
+
+import os
+ast_url = os.getenv("AST_URL", 'http://localhost:8088/')
+ast_username = os.getenv("AST_USER", 'asterisk')
+ast_password = os.getenv("AST_PASS", 'asterisk')
+ast_app = os.getenv("AST_APP", 'hello')
 
 async def on_dtmf(channel, event):
     """Callback for DTMF events.
@@ -64,9 +70,8 @@ sessions = {}
 
 logging.basicConfig(level=logging.DEBUG)
 loop = asyncio.get_event_loop()
-client = ari.connect('http://192.168.254.60:8088/', 'remari', '@rip@$$', loop=loop)
-loop.run_until_complete(client.init())
+client = loop.run_until_complete(aioari.connect(ast_url, ast_username,ast_password, loop=loop))
 client.on_channel_event('StasisStart', on_start)
 client.on_channel_event('StasisEnd', on_end)
 # Run the WebSocket
-loop.run_until_complete(client.run(apps="hello"))
+loop.run_until_complete(client.run(apps=ast_app))
