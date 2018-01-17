@@ -184,18 +184,24 @@ class BaseObject(object):
         :param kwargs: Keyword arguments to pass to fn
         """
 
-        def fn_filter(objects, event, *args, **kwargs):
+        async def fn_filter(objects, event, *args, **kwargs):
             """Filter received events for this object.
 
             :param objects: Objects found in this event.
             :param event: Event.
             """
+            res = None
             if isinstance(objects, dict):
                 if self.id in [c.id for c in objects.values()]:
-                    return fn(objects, event, *args, **kwargs)
+                    res = fn(objects, event, *args, **kwargs)
             else:
                 if self.id == objects.id:
-                    return fn(objects, event, *args, **kwargs)
+                    res = fn(objects, event, *args, **kwargs)
+            # The callback may or may not be an async function
+            if hasattr(res,'__await__'):
+                await res
+            return res
+
 
         if not self.event_reg:
             msg = "Event callback registration called on object with no events"
