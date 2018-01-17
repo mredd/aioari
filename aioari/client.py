@@ -99,7 +99,8 @@ class Client(object):
                 log.error("Invalid event: %s" % msg)
                 continue
 
-            listeners = list(self.event_listeners.get(msg_json['type'], []))
+            listeners = list(self.event_listeners.get(msg_json['type'], [])) \
+                      + list(self.event_listeners.get('*', []))
             for listener in listeners:
                 # noinspection PyBroadException
                 try:
