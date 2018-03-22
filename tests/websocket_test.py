@@ -9,7 +9,7 @@ import aiohttp
 import asyncio
 import httpretty
 
-from aioari_test.utils import AriTestCase
+from .utils import AriTestCase
 from aioswagger11.http_client import AsynchronousHttpClient
 
 BASE_URL = "http://ari.py/ari"
