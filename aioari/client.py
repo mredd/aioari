@@ -10,8 +10,10 @@ import urllib
 import aiohttp
 import aioswagger11.client
 
-from aioari.model import *
+from aioari.model import Repository
+from aioari.model import Channel, Bridge, Playback, LiveRecording, StoredRecording, Endpoint, DeviceState, Sound
 
+import logging
 log = logging.getLogger(__name__)
 
 
