@@ -1,4 +1,10 @@
-aioari (0.10.0-1) smurf; urgency=low
+aioari (0.10.0-2) unstable; urgency=medium
+
+  * Change Distribution to Unstable
+
+ -- Matthias Urlichs <matthias@urlichs.de>  Thu, 22 Mar 2018 21:42:36 +0100
+
+aioari (0.10.0-1) unstable; urgency=low
 
   * source package automatically created by stdeb 0.8.5
 
