@@ -98,23 +98,27 @@ class Client(object):
             if not isinstance(msg_json, dict) or 'type' not in msg_json:
                 log.error("Invalid event: %s" % msg)
                 continue
+            await self.process_ws(msg_json)
 
-            listeners = list(self.event_listeners.get(msg_json['type'], [])) \
-                      + list(self.event_listeners.get('*', []))
-            for listener in listeners:
-                # noinspection PyBroadException
-                try:
-                    callback, args, kwargs = listener
-                    log.debug("cb_type=%s" % type(callback))
-                    args = args or ()
-                    kwargs = kwargs or {}
-                    cb = callback(msg_json, *args, **kwargs)
-                    # The callback may or may not be an async function
-                    if hasattr(cb,'__await__'):
-                        await cb
+    async def process_ws(self, msg):
+        """Process one incoming websocket message"""
 
-                except Exception as e:
-                    self.exception_handler(e)
+        listeners = list(self.event_listeners.get(msg['type'], [])) \
+                    + list(self.event_listeners.get('*', []))
+        for listener in listeners:
+            # noinspection PyBroadException
+            try:
+                callback, args, kwargs = listener
+                log.debug("cb_type=%s" % type(callback))
+                args = args or ()
+                kwargs = kwargs or {}
+                cb = callback(msg, *args, **kwargs)
+                # The callback may or may not be an async function
+                if hasattr(cb,'__await__'):
+                    await cb
+
+            except Exception as e:
+                self.exception_handler(e)
 
     async def run(self, apps, *, _test_msgs=[]):
         """Connect to the WebSocket and begin processing messages.
