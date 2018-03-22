@@ -29,7 +29,7 @@ class Client(object):
         self.swagger = aioswagger11.client.SwaggerClient(
             http_client=http_client, url=url)
 
-    async def init(self):
+    async def init(self, RepositoryFactory=Repository):
         await self.swagger.init()
         # Extract models out of the events resource
         events = [api['api_declaration']
@@ -77,6 +77,18 @@ class Client(object):
         :rtype:  aioari.model.Repository
         """
         return self.repositories.get(name)
+
+    async def run_operation(self, oper, **kwargs):
+        """Trigger an operation.
+        Overrideable for Trio.
+        """
+        return await oper(**kwargs)
+
+    async def get_resp_text(self, resp):
+        """Get the text from a response.
+        Overrideable for Trio.
+        """
+        return await resp.text()
 
     async def __run(self, ws):
         """Drains all messages from a WebSocket, sending them to the client's
