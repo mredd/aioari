@@ -20,6 +20,7 @@ Stasis events relating to that object.
 import re
 import logging
 import json
+import inspect
 
 from aiohttp.web_exceptions import HTTPNoContent
 
@@ -198,7 +199,7 @@ class BaseObject(object):
                 if self.id == objects.id:
                     res = fn(objects, event, *args, **kwargs)
             # The callback may or may not be an async function
-            if hasattr(res,'__await__'):
+            if inspect.iscoroutine(res):
                 await res
             return res
 
